@@ -11,3 +11,9 @@ type Point struct {
 	X int
 	Y int
 }
+
+type Placement struct {
+	PieceIndex int
+	X          int
+	Y          int
+}
