@@ -22,7 +22,6 @@ func Run(path string) error {
 		return fmt.Errorf("Could not solve tetrominoes %w", err)
 	}
 
-	_ = board
-	printBoard(board)
+	fmt.Print(renderBoard(board))
 	return nil
 }

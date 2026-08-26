@@ -1,5 +1,7 @@
 package tetris
 
+import "fmt"
+
 func generatePlacements(pieces []Tetromino, size int) []Placement {
 	placements := make([]Placement, 0)
 
@@ -50,43 +52,56 @@ func buildExactRows(
 	return rows
 }
 
-func buildDLX(rows []ExactRow, columnCount int) *DLX {
+func buildDLX(
+	rows []ExactRow,
+	columnCount int,
+	primaryCount int,
+) *DLX {
 	dlx := &DLX{
 		Root:    &Column{Name: -1},
 		Columns: make([]*Column, columnCount),
 	}
 
-	// Root points to itself initially.
-	dlx.Root.Left = &dlx.Root.Node
-	dlx.Root.Right = &dlx.Root.Node
+	root := &dlx.Root.Node
 
-	// 1. Create and horizontally link all column headers.
-	previous := &dlx.Root.Node
+	root.Left = root
+	root.Right = root
+
+	previousPrimary := root
 
 	for i := 0; i < columnCount; i++ {
 		column := &Column{
 			Name: i,
 		}
 
-		// A new empty column points to itself vertically.
+		column.Column = column
+
+		// Every column needs a vertical circular list.
 		column.Up = &column.Node
 		column.Down = &column.Node
 
-		// Link this column horizontally after "previous".
-		column.Left = previous
-		column.Right = &dlx.Root.Node
+		if i < primaryCount {
+			// Primary column: link it into Root's horizontal list.
+			column.Left = previousPrimary
+			column.Right = root
 
-		previous.Right = &column.Node
-		dlx.Root.Left = &column.Node
+			previousPrimary.Right = &column.Node
+			root.Left = &column.Node
+
+			previousPrimary = &column.Node
+		} else {
+			// Secondary column: do NOT link it to Root.
+			column.Left = &column.Node
+			column.Right = &column.Node
+		}
 
 		dlx.Columns[i] = column
-		previous = &column.Node
 	}
 
-	// 2. Create the nodes for every exact-cover row.
+	// Build the placement rows.
 	for rowIndex, row := range rows {
 		var first *Node
-		var previousNode *Node
+		var previous *Node
 
 		for _, columnIndex := range row.Columns {
 			column := dlx.Columns[columnIndex]
@@ -96,7 +111,7 @@ func buildDLX(rows []ExactRow, columnCount int) *DLX {
 				RowIndex: rowIndex,
 			}
 
-			// Insert node at the bottom of its column.
+			// Insert vertically at bottom of column.
 			node.Down = &column.Node
 			node.Up = column.Up
 
@@ -105,21 +120,20 @@ func buildDLX(rows []ExactRow, columnCount int) *DLX {
 
 			column.Size++
 
-			// Link nodes horizontally inside this row.
+			// Link horizontally inside the placement row.
 			if first == nil {
 				first = node
-
 				node.Left = node
 				node.Right = node
 			} else {
-				node.Left = previousNode
+				node.Left = previous
 				node.Right = first
 
-				previousNode.Right = node
+				previous.Right = node
 				first.Left = node
 			}
 
-			previousNode = node
+			previous = node
 		}
 	}
 
@@ -215,6 +229,70 @@ func chooseColumn(dlx *DLX) *Column {
 	return best
 }
 
-func solve() {
+func solve(pieces []Tetromino) ([][]byte, error) {
+	if len(pieces) == 0 {
+		return nil, fmt.Errorf("cannot solve an empty set of tetrominoes")
+	}
 
+	totalArea := len(pieces) * 4
+	size := 1
+	for size*size < totalArea {
+		size++
+	}
+
+	for _, piece := range pieces {
+		if piece.Width > size {
+			size = piece.Width
+		}
+		if piece.Height > size {
+			size = piece.Height
+		}
+	}
+
+	for {
+		placements := generatePlacements(pieces, size)
+		rows := buildExactRows(pieces, placements, size)
+		columnCount := len(pieces) + size*size
+		dlx := buildDLX(rows, columnCount, len(pieces))
+		solution := make([]int, 0, len(pieces))
+
+		if !search(dlx, &solution) {
+			size++
+			continue
+		}
+
+		board := make([][]byte, size)
+		for y := range board {
+			board[y] = make([]byte, size)
+			for x := range board[y] {
+				board[y][x] = '.'
+			}
+		}
+
+		for _, rowIndex := range solution {
+			if rowIndex < 0 || rowIndex >= len(rows) {
+				return nil, fmt.Errorf("solver returned invalid row index %d", rowIndex)
+			}
+
+			placementIndex := rows[rowIndex].PlacementIndex
+			if placementIndex < 0 || placementIndex >= len(placements) {
+				return nil, fmt.Errorf("solver returned invalid placement index %d", placementIndex)
+			}
+
+			placement := placements[placementIndex]
+			piece := pieces[placement.PieceIndex]
+
+			for _, cell := range piece.Cells {
+				x := placement.X + cell.X
+				y := placement.Y + cell.Y
+
+				if board[y][x] != '.' {
+					return nil, fmt.Errorf("solver produced overlapping placements at (%d,%d)", x, y)
+				}
+				board[y][x] = piece.Letter
+			}
+		}
+
+		return board, nil
+	}
 }
