@@ -16,9 +16,205 @@ func generatePlacements(pieces []Tetromino, size int) []Placement {
 	return placements
 }
 
-// CALCULATE BOARD SIZE - USE CODE LATER
-// totalArea := len(pieces)*4
-// dimention := 2
-// for dimention*dimention <= totalArea {
-// 	dimention++
-// }
+func buildExactRows(
+	pieces []Tetromino,
+	placements []Placement,
+	size int,
+) []ExactRow {
+	rows := make([]ExactRow, 0, len(placements))
+
+	for placementIndex, placement := range placements {
+		piece := pieces[placement.PieceIndex]
+
+		var columns [5]int
+
+		//First constraint: this piece is used
+		columns[0] = placement.PieceIndex
+
+		//Remaining 4 constraints: occupied board cells
+		for i, cell := range piece.Cells {
+			boardX := placement.X + cell.X
+			boardY := placement.Y + cell.Y
+
+			boardCostraint := len(pieces) + boardY*size + boardX
+
+			columns[i+1] = boardCostraint
+		}
+		rows = append(rows, ExactRow{
+			PlacementIndex: placementIndex,
+			Columns:        columns,
+		})
+
+	}
+
+	return rows
+}
+
+func buildDLX(rows []ExactRow, columnCount int) *DLX {
+	dlx := &DLX{
+		Root:    &Column{Name: -1},
+		Columns: make([]*Column, columnCount),
+	}
+
+	// Root points to itself initially.
+	dlx.Root.Left = &dlx.Root.Node
+	dlx.Root.Right = &dlx.Root.Node
+
+	// 1. Create and horizontally link all column headers.
+	previous := &dlx.Root.Node
+
+	for i := 0; i < columnCount; i++ {
+		column := &Column{
+			Name: i,
+		}
+
+		// A new empty column points to itself vertically.
+		column.Up = &column.Node
+		column.Down = &column.Node
+
+		// Link this column horizontally after "previous".
+		column.Left = previous
+		column.Right = &dlx.Root.Node
+
+		previous.Right = &column.Node
+		dlx.Root.Left = &column.Node
+
+		dlx.Columns[i] = column
+		previous = &column.Node
+	}
+
+	// 2. Create the nodes for every exact-cover row.
+	for rowIndex, row := range rows {
+		var first *Node
+		var previousNode *Node
+
+		for _, columnIndex := range row.Columns {
+			column := dlx.Columns[columnIndex]
+
+			node := &Node{
+				Column:   column,
+				RowIndex: rowIndex,
+			}
+
+			// Insert node at the bottom of its column.
+			node.Down = &column.Node
+			node.Up = column.Up
+
+			column.Up.Down = node
+			column.Up = node
+
+			column.Size++
+
+			// Link nodes horizontally inside this row.
+			if first == nil {
+				first = node
+
+				node.Left = node
+				node.Right = node
+			} else {
+				node.Left = previousNode
+				node.Right = first
+
+				previousNode.Right = node
+				first.Left = node
+			}
+
+			previousNode = node
+		}
+	}
+
+	return dlx
+}
+
+func cover(column *Column) {
+	// Remove the column header from the horizontal list.
+	column.Left.Right = column.Right
+	column.Right.Left = column.Left
+
+	// Visit every placement that uses this constraint.
+	for row := column.Down; row != &column.Node; row = row.Down {
+
+		// Visit every other constraint used by that placement.
+		for node := row.Right; node != row; node = node.Right {
+
+			// Remove this node from its vertical column.
+			node.Up.Down = node.Down
+			node.Down.Up = node.Up
+
+			node.Column.Size--
+		}
+	}
+}
+
+func uncover(column *Column) {
+	// Reverse cover() in the opposite order.
+	for row := column.Up; row != &column.Node; row = row.Up {
+
+		for node := row.Left; node != row; node = node.Left {
+
+			node.Column.Size++
+
+			// Restore this node into its vertical column.
+			node.Up.Down = node
+			node.Down.Up = node
+		}
+	}
+
+	// Restore the column header to the horizontal list.
+	column.Left.Right = &column.Node
+	column.Right.Left = &column.Node
+}
+
+func search(dlx *DLX, solution *[]int) bool {
+	if dlx.Root.Right == &dlx.Root.Node {
+		return true
+	}
+
+	column := chooseColumn(dlx)
+
+	cover(column)
+
+	for row := column.Down; row != &column.Node; row = row.Down {
+		*solution = append(*solution, row.RowIndex)
+
+		for node := row.Right; node != row; node = node.Right {
+			cover(node.Column)
+		}
+
+		if search(dlx, solution) {
+			return true
+		}
+
+		for node := row.Left; node != row; node = node.Left {
+			uncover(node.Column)
+		}
+
+		*solution = (*solution)[:len(*solution)-1]
+	}
+
+	uncover(column)
+
+	return false
+}
+
+func chooseColumn(dlx *DLX) *Column {
+	var best *Column
+
+	for node := dlx.Root.Right; node != &dlx.Root.Node; node = node.Right {
+		column := node.Column
+
+		if column.Size == 0 {
+			return column
+		}
+
+		if best == nil || column.Size < best.Size {
+			best = column
+		}
+	}
+
+	return best
+}
+
+func solve() {
+
+}
