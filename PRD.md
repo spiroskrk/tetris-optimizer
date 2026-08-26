@@ -33,9 +33,12 @@ Rules:
 - The program expects exactly one argument.
 - The argument must be the path to the input text file.
 - The input file must contain at least one tetromino.
+- The input file may contain at most 26 tetrominoes, labelled `A` through `Z`.
 - The program is non-interactive.
 - The program does not request additional input from the user.
 - The result is written to standard output.
+- CLI errors are also written to standard output.
+- CLI errors return normally with exit status `0`.
 
 If the number of arguments is invalid, the program prints:
 
@@ -358,6 +361,7 @@ Responsibilities:
 - Normalize `\r\n` to `\n`.
 - Remove one optional trailing newline.
 - Reject empty input.
+- Reject input containing more than 26 tetrominoes.
 - Split the file into blocks using:
 
 strings.Split(data, "\n\n")
@@ -720,9 +724,7 @@ CLI
  ↓
 File Reader
  ↓
-Parser
- ↓
-Validator
+Parser and Validator
  ↓
 Normalized Tetromino Model
  ↓
@@ -735,6 +737,9 @@ Algorithm X / DLX
 Board Reconstruction
  ↓
 Renderer
+
+Parsing and validation are kept together in `parser.go`. The parser validates dimensions,
+characters, occupied-cell count, and connectivity before returning normalized tetrominoes.
 
 The solver operates on possible placements rather than directly mutating a game board during recursive search.
 
@@ -755,13 +760,10 @@ tetrisoptimizer/
     ├── run.go
     ├── types.go
     ├── parser.go
-    ├── connectivity.go
-    ├── normalize.go
-    ├── placement.go
-    ├── matrix.go
-    ├── dlx.go
     ├── solver.go
-    └── render.go
+    ├── solver_test.go
+    ├── board.go
+    └── board_test.go
 
 All files inside:
 
@@ -1064,11 +1066,14 @@ Tetromino orientation is exactly the orientation given in the input file.
 - Exact Cover column design must correctly distinguish mandatory piece constraints from optional board-cell constraints.
 - Placement rows must preserve enough metadata to reconstruct the final board.
 - Large candidate boards may generate many placement rows.
-- The allowed maximum number of tetrominoes should be verified against the school specification, especially because letters are limited to uppercase Latin characters.
 
 ---
 
 ## 27. Design Decisions
+
+### Maximum of 26 Tetrominoes
+
+Inputs are limited to 26 tetrominoes so every piece can be represented by one uppercase Latin letter from `A` through `Z`.
 
 ### Exact Cover Instead of Direct Board Backtracking
 

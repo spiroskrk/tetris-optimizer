@@ -1,4 +1,4 @@
-package tetrisoptimizer
+package main
 
 import (
 	"fmt"

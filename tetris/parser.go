@@ -140,6 +140,9 @@ func parseData(data string) ([]Tetromino, error) {
 	}
 
 	blocks := strings.Split(data, "\n\n")
+	if len(blocks) > 26 {
+		return nil, fmt.Errorf("input contains %d tetrominoes; maximum is 26", len(blocks))
+	}
 
 	pieces := make([]Tetromino, 0, len(blocks))
 	for i, block := range blocks {
