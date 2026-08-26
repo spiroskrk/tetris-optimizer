@@ -27,6 +27,7 @@ Command:
 
 ```bash
 go run . input.txt
+```
 
 Rules:
 
@@ -421,7 +422,7 @@ parseData
  ↓
 solve
  ↓
-render
+renderBoard
 
 `Run` should not contain parsing or solving algorithms directly.
 
@@ -752,18 +753,23 @@ This allows parsing and solving responsibilities to remain separate.
 Recommended structure:
 
 tetrisoptimizer/
+├── .gitignore
 ├── go.mod
 ├── main.go
+├── main_test.go
 ├── README.md
 ├── PRD.md
 └── tetris/
-    ├── run.go
-    ├── types.go
+    ├── board.go
+    ├── board_test.go
     ├── parser.go
+    ├── parser_test.go
+    ├── run.go
+    ├── run_test.go
     ├── solver.go
     ├── solver_test.go
-    ├── board.go
-    └── board_test.go
+    ├── tests_md_test.go
+    └── types.go
 
 All files inside:
 
@@ -793,14 +799,17 @@ parseData
 parseBlock
 isConnected
 isAdjacent
+abs
 normalize
 generatePlacements
-buildMatrix
+buildExactRows
+buildDLX
 cover
 uncover
 search
+chooseColumn
 solve
-render
+renderBoard
 
 This keeps internal implementation details hidden from `main`.
 

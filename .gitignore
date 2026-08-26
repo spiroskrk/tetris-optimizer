@@ -1,0 +1,3 @@
+/tetris-optimizer
+*.test
+coverage.out

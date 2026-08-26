@@ -38,9 +38,9 @@ func buildExactRows(
 			boardX := placement.X + cell.X
 			boardY := placement.Y + cell.Y
 
-			boardCostraint := len(pieces) + boardY*size + boardX
+			boardConstraint := len(pieces) + boardY*size + boardX
 
-			columns[i+1] = boardCostraint
+			columns[i+1] = boardConstraint
 		}
 		rows = append(rows, ExactRow{
 			PlacementIndex: placementIndex,

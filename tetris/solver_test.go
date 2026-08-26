@@ -287,13 +287,24 @@ func assertBoardContents(t *testing.T, board [][]byte, pieces []Tetromino) {
 	t.Helper()
 
 	counts := make(map[byte]int)
+	positions := make(map[byte][]Point)
+	knownLetters := make(map[byte]bool, len(pieces))
+	for _, piece := range pieces {
+		knownLetters[piece.Letter] = true
+	}
+
 	for y, row := range board {
 		if len(row) != len(board) {
 			t.Fatalf("board row %d has width %d; want %d", y, len(row), len(board))
 		}
-		for _, cell := range row {
+		for x, cell := range row {
 			if cell != '.' {
+				if !knownLetters[cell] {
+					t.Errorf("board contains unexpected character %q at (%d,%d)", cell, x, y)
+					continue
+				}
 				counts[cell]++
+				positions[cell] = append(positions[cell], Point{X: x, Y: y})
 			}
 		}
 	}
@@ -301,6 +312,32 @@ func assertBoardContents(t *testing.T, board [][]byte, pieces []Tetromino) {
 	for _, piece := range pieces {
 		if counts[piece.Letter] != 4 {
 			t.Errorf("piece %q occupies %d cells; want 4", piece.Letter, counts[piece.Letter])
+			continue
+		}
+
+		actualCells := [4]Point{}
+		copy(actualCells[:], positions[piece.Letter])
+		actualCells, actualWidth, actualHeight := normalize(actualCells)
+		if actualWidth != piece.Width || actualHeight != piece.Height {
+			t.Errorf(
+				"piece %q dimensions = %dx%d; want %dx%d",
+				piece.Letter,
+				actualWidth,
+				actualHeight,
+				piece.Width,
+				piece.Height,
+			)
+		}
+
+		actualSet := make(map[Point]bool, 4)
+		for _, cell := range actualCells {
+			actualSet[cell] = true
+		}
+		for _, expectedCell := range piece.Cells {
+			if !actualSet[expectedCell] {
+				t.Errorf("piece %q does not preserve its input shape", piece.Letter)
+				break
+			}
 		}
 	}
 }
